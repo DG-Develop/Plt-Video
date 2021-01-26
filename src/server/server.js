@@ -10,7 +10,6 @@ import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import reducer from '../frontend/reducers';
 import Layout from '../frontend/components/Layout';
-import initialState from '../frontend/initialState';
 import serverRoutes from '../frontend/routes/serverRoutes';
 import getManifest from './getManifest';
 
@@ -77,14 +76,46 @@ const setResponse = (html, preloadedState, manifest) => {
   );
 };
 
-const renderApp = (req, res) => {
+const renderApp = async (req, res) => {
+  let initialState
+  const { token, email, name, id } = req.cookies
+
+  try {
+    let movieList = await axios({
+      url: `${process.env.API_URL}/api/movies`,
+      headers: { Authorization: `Bearer ${token}` },
+      method: 'get'
+    })
+
+    movieList = movieList.data.data
+
+    initialState = {
+      user: {
+        id, email, name
+      },
+      playing: {},
+      myList: [],
+      trends: movieList.filter(movie => movie.contentRating === 'PG' && movie._id),
+      originals: movieList.filter(movie => movie.contentRating === 'G' && movie._id)
+    }
+  } catch (error) {
+    initialState = {
+      user: {},
+      playing: {},
+      myList: [],
+      trends: [],
+      originals: []
+    }
+  }
+
   const store = createStore(reducer, initialState);
   const preloadedState = store.getState();
+  const isLogged = (initialState.user.id)
   const html = renderToString(
     <Provider store={store}>
       <StaticRouter location={req.url} context={{}}>
         <Layout>
-          {renderRoutes(serverRoutes)}
+          {renderRoutes(serverRoutes(isLogged))}
         </Layout>
       </StaticRouter>
     </Provider>
@@ -99,29 +130,29 @@ app.post("/auth/sign-in", async function (req, res, next) {
         next(boom.unauthorized());
       }
 
-      req.login(data, { session: false }, async function (error) {
-        if (error) {
-          next(error);
+      req.login(data, { session: false }, async function (err) {
+        if (err) {
+          next(err);
         }
 
         const { token, ...user } = data;
 
         res.cookie("token", token, {
-          httpOnly: !config.dev,
-          secure: !config.dev
+          httpOnly: !(ENV === 'development'),
+          secure: !(ENV === 'development')
         });
 
         res.status(200).json(user);
       });
-    } catch (error) {
-      next(error);
+    } catch (err) {
+      next(err);
     }
   })(req, res, next);
 });
 
 app.post("/auth/sign-up", async function (req, res, next) {
   const { body: user } = req;
-  
+
   try {
     const userData = await axios({
       url: `${process.env.API_URL}/api/auth/sign-up`,
@@ -142,6 +173,28 @@ app.post("/auth/sign-up", async function (req, res, next) {
     next(error);
   }
 });
+
+app.post("/user-movies", async function (req, res, next) {
+  try {
+      const { body: userMovie } = req
+      const { token } = req.cookies
+
+      const { data, status } = await axios({
+          url: `${config.apiUrl}/api/user-movies`,
+          headers: { Authorization: `Bearer ${token}` },
+          method: 'post',
+          data: userMovie
+      })
+
+      if (status !== 201) {
+          return next(boom.badImplementation())
+      }
+
+      res.status(201).json(data)
+  } catch (error) {
+      next(error)
+  }
+})
 
 
 app.get('*', renderApp);
