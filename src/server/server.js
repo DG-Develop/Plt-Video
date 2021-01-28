@@ -89,12 +89,30 @@ const renderApp = async (req, res) => {
 
     movieList = movieList.data.data
 
+    let userMovies = await axios({
+      url: `${process.env.API_URL}/api/user-movies?userId=${id}`,
+      headers: { Authorization: `Bearer ${token}` },
+      method: 'get'
+    })
+
+    userMovies = userMovies.data.data
+
+    const myList = []
+    userMovies.forEach(userMovie => {
+      movieList.forEach(movie => {
+        if (movie._id === userMovie.movieId) {
+          const data = { ...movie, userMovieId: userMovie._id }
+          myList.push(data)
+        }
+      })
+    })
+
     initialState = {
       user: {
         id, email, name
       },
       playing: {},
-      myList: [],
+      myList,
       trends: movieList.filter(movie => movie.contentRating === 'PG' && movie._id),
       originals: movieList.filter(movie => movie.contentRating === 'G' && movie._id)
     }
@@ -176,21 +194,42 @@ app.post("/auth/sign-up", async function (req, res, next) {
 
 app.post("/user-movies", async function (req, res, next) {
   try {
-      const { body: userMovie } = req
+    const { body: userMovie } = req
+    const { token } = req.cookies
+
+    const { data, status } = await axios({
+      url: `${process.env.API_URL}/api/user-movies`,
+      headers: { Authorization: `Bearer ${token}` },
+      method: 'post',
+      data: userMovie
+    })
+
+    if (status !== 201) {
+      return next(boom.badImplementation())
+    }
+
+    res.status(201).json(data)
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.delete("/user-movies/:userMovieId", async function (req, res, next) {
+  try {
+      const { userMovieId } = req.params
       const { token } = req.cookies
 
       const { data, status } = await axios({
-          url: `${config.apiUrl}/api/user-movies`,
+          url: `${process.env.API_URL}/api/user-movies/${userMovieId}`,
           headers: { Authorization: `Bearer ${token}` },
-          method: 'post',
-          data: userMovie
+          method: "delete"
       })
 
-      if (status !== 201) {
+      if (status !== 200) {
           return next(boom.badImplementation())
       }
 
-      res.status(201).json(data)
+      res.status(200).json(data)
   } catch (error) {
       next(error)
   }

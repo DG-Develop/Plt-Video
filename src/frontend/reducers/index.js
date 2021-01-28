@@ -8,7 +8,7 @@ const reducer = (state, action) => {
     case 'DELETE_FAVORITE':
       return {
         ...state,
-        myList: state.myList.filter(items => items.id !== action.payload)
+        myList: state.myList.filter(items => items.userMovieId !== action.payload)
       }
     case 'LOGIN_REQUEST':
     case 'REGISTER_REQUEST':

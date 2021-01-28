@@ -20,7 +20,7 @@ export const registerRequest = payload => ({
   payload,
 });
 
-export const deteleFavorite = payload => ({
+export const deleteFavorite = payload => ({
   type: 'DELETE_FAVORITE',
   payload,
 });
@@ -46,17 +46,6 @@ export const registerUser = (payload, redirectUrl) => {
   }
 }
 
-export const favoriteMovie = (userId, movie, cb) => (dispatch) => {
-  axios({
-    url: '/user-movies',
-    method: 'post',
-    data: { userId, movieId: movie.id }
-  })
-  .then(({ data }) => {
-    /* const { data : { movieExist }} */
-  })
-}
-
 export const loginUser = ({ email, password }, redirectUrl) => {
   return (dispatch) => {
     axios({
@@ -67,18 +56,39 @@ export const loginUser = ({ email, password }, redirectUrl) => {
         password
       }
     })
-    .then(({ data }) => {
-      document.cookie = `email=${data.user.email}`
-      document.cookie = `name=${data.user.name}`
-      document.cookie = `id=${data.user.id}`
-      
-      dispatch(loginRequest(data.user))
-    })
-    .then(() => {
-      window.location.href = redirectUrl
-    })
-    .catch(error => dispatch(setError(error)))
+      .then(({ data }) => {
+        document.cookie = `email=${data.user.email}`
+        document.cookie = `name=${data.user.name}`
+        document.cookie = `id=${data.user.id}`
+
+        dispatch(loginRequest(data.user))
+      })
+      .then(() => {
+        window.location.href = redirectUrl
+      })
+      .catch(error => dispatch(setError(error)))
   }
 }
 
-export { setFavorite as default }
+export const favoriteMovie = (userId, movie) => (dispatch) => {
+  axios({
+    url: '/user-movies',
+    method: 'post',
+    data: { userId, movieId: movie._id }
+  })
+    .then(({ data }) => {
+      const { data: { movieExist } } = data
+
+      const userMovie = { ...movie, userMovieId: data.data }
+      !movieExist && dispatch(setFavorite(userMovie))
+    })
+}
+
+export const dropFavorite = (userMovieId) => (dispatch) => {
+  axios({
+    url: `/user-movies/${userMovieId}`,
+    method: 'delete'
+  })
+    .then(() => dispatch(deleteFavorite(userMovieId)))
+    .catch(error => dispatch(setError(error)))
+}
